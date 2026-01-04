@@ -8,7 +8,11 @@ This project supports real-time virtual try-on without the need for any special 
 Unlike other image-based virtual try-on methods, our approach requires training a dedicated network for each garment in a low-barrier, accessible way (see [this paper](https://arxiv.org/abs/2506.10468)).
 Our method simply overlay the synthesized garment on the top of human body without removing the original garment to achieve real-time performace.
 
-![Demo GIF](assets/output.gif)
+<p align="center">
+  <img src="assets/output.gif" width="45%" />
+  <img src="assets/Han.gif" width="46%" />
+</p>
+
 
 Check our [tight garment demo](https://www.youtube.com/watch?v=dub0pJ2kXA4) and [loose garment demo](https://www.youtube.com/watch?v=7hm1yBsFzHc) on YouTube.
 
