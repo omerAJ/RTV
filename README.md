@@ -28,7 +28,7 @@ cd RTV
 ```
 sudo apt install gcc g++ libxcb-xinerama0-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xkb-dev 
 sudo apt install qtbase5-dev qtbase5-dev-tools libqt5gui5 libqt5widgets5 libqt5multimedia5 libqt5multimediawidgets5 libqt5multimedia5-plugins libpulse-mainloop-glib0
-conda create -n rtv python=3.9
+conda create -n rtv python=3.12
 conda activate rtv
 pip install -r requirements.txt
 pip install --no-build-isolation detectron2@git+https://github.com/facebookresearch/detectron2.git
@@ -60,13 +60,12 @@ python rtl_demo.py
   organization={Wiley Online Library}
 }
 
-@misc{wu2025lowbarrier,
-    title={Low-Barrier Dataset Collection with Real Human Body for Interactive Per-Garment Virtual Try-On},
-    author={Zaiqiang Wu and Yechen Li and Jingyuan Liu and Yuki Shibata and Takayuki Hori and I-Chao Shen and Takeo Igarashi},
-    year={2025},
-    eprint={2506.10468},
-    archivePrefix={arXiv},
-    primaryClass={cs.GR}
+@article{wu2025low,
+  title={Low-barrier dataset collection with real human body for interactive per-garment virtual try-on},
+  author={Wu, Zaiqiang and Li, Yechen and Liu, Jingyuan and Shibata, Yuki and Hori, Takayuki and Shen, I-Chao and Igarashi, Takeo},
+  journal={IEEE Computer Graphics and Applications},
+  year={2025},
+  publisher={IEEE}
 }
 ```
 
