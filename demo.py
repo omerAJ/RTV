@@ -58,9 +58,10 @@ class CameraApp(QMainWindow):
         self.setWindowTitle("Virtual Try-On")
         self.setGeometry(100, 100, 800, 600)
         self.setMinimumSize(200, 150)
-        ## enable fullscreen
-        self.setWindowFlag(Qt.FramelessWindowHint)
-        self.showFullScreen()
+        self.start_fullscreen = os.environ.get("RTV_FULLSCREEN", "").lower() in {"1", "true", "yes"}
+        if self.start_fullscreen:
+            self.setWindowFlag(Qt.FramelessWindowHint)
+            self.showFullScreen()
 
         self.image_label = QLabel(self)
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -86,6 +87,12 @@ class CameraApp(QMainWindow):
         self.viton_thread = VitonThread()
         self.viton_thread.frameCaptured.connect(self.update_image)
         self.viton_thread.start()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Q, Qt.Key_Escape):
+            self.close()
+            return
+        super().keyPressEvent(event)
 
 
     def update_image(self, q_img):

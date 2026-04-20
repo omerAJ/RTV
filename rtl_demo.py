@@ -33,22 +33,26 @@ class VitonThread(QThread):
         self.frame_processor.set_target_garment(id)
 
     def get_camera(self):
-        cap = cv2.VideoCapture(1)
-
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(0)
-        return cap
+        # Prefer the DroidCam virtual webcam when it is present.
+        for source in ((2, cv2.CAP_V4L2), ("/dev/video2", cv2.CAP_V4L2), (1, cv2.CAP_V4L2), (0, cv2.CAP_V4L2)):
+            cap = cv2.VideoCapture(*source)
+            if cap.isOpened():
+                print(f"Using camera source: {source[0]}")
+                return cap
+            cap.release()
+        print("Falling back to default camera source 0")
+        return cv2.VideoCapture(0, cv2.CAP_V4L2)
 
     def run(self):
         while self.running:
             ret, frame = self.cap.read()
 
             if ret:
-                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-                ## ichao: remove flip (Nov 13, 2024)
+                # Keep the webcam's native orientation. The forced 90 degree
+                # rotation made standard upright webcams appear sideways and
+                # reduced usable framing before the 16:9 crop.
                 frame=cv2.flip(frame, 1)
                 frame=resize_img(frame,max_height=1024)
-                #frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 frame=crop2_169(frame)
                 frame = self.frame_processor(frame)
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -56,6 +60,8 @@ class VitonThread(QThread):
                 step = channel * width
                 q_img = QImage(frame.data, width, height, step, QImage.Format_RGB888)
                 self.frameCaptured.emit(q_img)
+            else:
+                print("Camera opened but no frame was read from the selected source.")
 
 
     def stop(self):
@@ -68,9 +74,10 @@ class CameraApp(QMainWindow):
         self.setWindowTitle("Virtual Try-On")
         self.setGeometry(100, 100, 800, 600)
         self.setMinimumSize(200, 150)
-        ## enable fullscreen
-        self.setWindowFlag(Qt.FramelessWindowHint)
-        self.showFullScreen()
+        self.start_fullscreen = os.environ.get("RTV_FULLSCREEN", "").lower() in {"1", "true", "yes"}
+        if self.start_fullscreen:
+            self.setWindowFlag(Qt.FramelessWindowHint)
+            self.showFullScreen()
 
         self.image_label = QLabel(self)
         self.image_label.setAlignment(Qt.AlignCenter)
