@@ -17,6 +17,39 @@ import math
 def lcm(a, b): return abs(a * b) / math.gcd(a, b) if a and b else 0
 import time
 
+
+def load_training_state(iter_path, optimizer_G, optimizer_D, checkpoints_dir, run_name):
+    start_epoch, epoch_iter = 1, 0
+    if os.path.exists(iter_path):
+        try:
+            start_epoch, epoch_iter = np.loadtxt(iter_path, delimiter=',', dtype=int)
+            print(f"Resuming from epoch {start_epoch} at iteration {epoch_iter}")
+        except Exception as exc:
+            print(f"Failed to read {iter_path}, starting from scratch: {exc}")
+            start_epoch, epoch_iter = 1, 0
+
+    optimizer_G_path = os.path.join(checkpoints_dir, run_name, 'latest_optimizer_G.pth')
+    optimizer_D_path = os.path.join(checkpoints_dir, run_name, 'latest_optimizer_D.pth')
+
+    if os.path.exists(optimizer_G_path):
+        optimizer_G.load_state_dict(torch.load(optimizer_G_path, map_location='cpu', weights_only=True))
+    else:
+        print(f"{optimizer_G_path} not exists yet!")
+
+    if os.path.exists(optimizer_D_path):
+        optimizer_D.load_state_dict(torch.load(optimizer_D_path, map_location='cpu', weights_only=True))
+    else:
+        print(f"{optimizer_D_path} not exists yet!")
+
+    return start_epoch, epoch_iter
+
+
+def save_training_state(iter_path, optimizer_G, optimizer_D, checkpoints_dir, run_name, epoch, epoch_iter):
+    run_dir = os.path.join(checkpoints_dir, run_name)
+    np.savetxt(iter_path, (epoch, epoch_iter), delimiter=',', fmt='%d')
+    torch.save(optimizer_G.state_dict(), os.path.join(run_dir, 'latest_optimizer_G.pth'))
+    torch.save(optimizer_D.state_dict(), os.path.join(run_dir, 'latest_optimizer_D.pth'))
+
 def main():
     opt = TrainOptions().parse()
     if opt.dataset_path is not None:
@@ -37,12 +70,17 @@ def main():
     opt.print_freq = lcm(opt.print_freq, opt.batchSize)
     optimizer_G, optimizer_D = model.module.optimizer_G, model.module.optimizer_D
 
+    iter_path = os.path.join(opt.checkpoints_dir, opt.name, 'iter.txt')
+    if opt.continue_train:
+        start_epoch, epoch_iter = load_training_state(
+            iter_path, optimizer_G, optimizer_D, opt.checkpoints_dir, opt.name
+        )
+
     total_steps = (start_epoch - 1) * dataset_size + epoch_iter
 
     display_delta = total_steps % opt.display_freq
     print_delta = total_steps % opt.print_freq
     save_delta = total_steps % opt.save_latest_freq
-    iter_path = os.path.join(opt.checkpoints_dir, opt.name, 'iter.txt')
 
     for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         epoch_start_time = time.time()
@@ -116,7 +154,9 @@ def main():
             if total_steps % opt.save_latest_freq == save_delta:
                 print('saving the latest model (epoch %d, total_steps %d)' % (epoch, total_steps))
                 model.module.save('latest')
-                np.savetxt(iter_path, (epoch, epoch_iter), delimiter=',', fmt='%d')
+                save_training_state(
+                    iter_path, optimizer_G, optimizer_D, opt.checkpoints_dir, opt.name, epoch, epoch_iter
+                )
 
 
 
@@ -133,7 +173,9 @@ def main():
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_steps))
             model.module.save('latest')
             model.module.save(epoch)
-            np.savetxt(iter_path, (epoch + 1, 0), delimiter=',', fmt='%d')
+            save_training_state(
+                iter_path, optimizer_G, optimizer_D, opt.checkpoints_dir, opt.name, epoch + 1, 0
+            )
 
         ### instead of only training the local enhancer, train the entire network after certain iterations
         if (opt.niter_fix_global != 0) and (epoch == opt.niter_fix_global):
