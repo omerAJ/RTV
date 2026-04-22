@@ -2,6 +2,16 @@ import sys
 import os
 
 #sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..")))
+os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
+os.environ.pop("QT_PLUGIN_PATH", None)
+try:
+    import PyQt5
+    pyqt_plugins = os.path.join(os.path.dirname(PyQt5.__file__), "Qt5", "plugins")
+    if os.path.isdir(pyqt_plugins):
+        os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = pyqt_plugins
+except Exception:
+    pass
+
 import cv2
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget, QSizePolicy, QScrollArea, QHBoxLayout, QPushButton, QListWidget, QListWidgetItem
@@ -14,6 +24,53 @@ from util.image_warp import crop2_169, resize_img
 
 from VITON.viton_upperbody import FrameProcessor
 from util.camera_util import list_available_cameras
+
+
+BUILTIN_GARMENTS = [
+    ("lab_03", "lab_03_vmsdp2ta"),
+    ("lab_04", "lab_04_vmsdp2ta"),
+    ("lab_07", "lab_07_vmsdp2ta"),
+    ("jin_17", "jin_17_vmsdp2ta"),
+    ("jin_18", "jin_18_vmsdp2ta"),
+    ("jin_22", "jin_22_vmsdp2ta"),
+]
+
+
+def build_demo_garments(checkpoints_dir="./rtv_ckpts", garment_images_dir="./assets/garment_images"):
+    builtins = []
+    builtin_checkpoint_names = set()
+
+    for thumbnail_name, checkpoint_name in BUILTIN_GARMENTS:
+        builtin_checkpoint_names.add(checkpoint_name)
+        builtins.append(
+            {
+                "display_name": thumbnail_name,
+                "checkpoint_name": checkpoint_name,
+                "thumbnail_path": os.path.join(garment_images_dir, f"{thumbnail_name}_white_bg.jpg"),
+            }
+        )
+
+    custom_garments = []
+    if os.path.isdir(checkpoints_dir):
+        for checkpoint_name in sorted(os.listdir(checkpoints_dir)):
+            checkpoint_path = os.path.join(checkpoints_dir, checkpoint_name)
+            if not os.path.isdir(checkpoint_path):
+                continue
+            if checkpoint_name in builtin_checkpoint_names:
+                continue
+            if not os.path.isfile(os.path.join(checkpoint_path, "latest_net_G.pth")):
+                continue
+
+            thumbnail_path = os.path.join(garment_images_dir, f"{checkpoint_name}_white_bg.jpg")
+            custom_garments.append(
+                {
+                    "display_name": checkpoint_name,
+                    "checkpoint_name": checkpoint_name,
+                    "thumbnail_path": thumbnail_path if os.path.isfile(thumbnail_path) else None,
+                }
+            )
+
+    return builtins + custom_garments
 
 
 class VitonThread(QThread):
@@ -108,20 +165,16 @@ class CameraApp(QMainWindow):
         item.setData(Qt.UserRole, -1)
         self.list_widget.addItem(item)
 
-        # Add 15 images to the horizontal layout
-        #garment_id_list = [3, 2, 17, 18, 22]
-        garment_name_list = ['lab_03','lab_04','lab_07','jin_17','jin_18','jin_22']
-        self.gid_map = dict()
-        self.gid_map[0] = -1
-        self.gid_map[1] = 3
-        self.gid_map[2] = 2
-        self.gid_map[3] = 17
-        self.gid_map[4] = 18
-        self.gid_map[5] = 22
-        
-        for i, garment in enumerate(garment_name_list):
+        demo_garments = build_demo_garments()
+        garment_name_list = [garment["checkpoint_name"] for garment in demo_garments]
+
+        for i, garment in enumerate(demo_garments):
             item = QListWidgetItem()
-            item.setIcon(QIcon('./assets/garment_images/'+garment+'_white_bg.jpg'))
+            if garment["thumbnail_path"] is not None:
+                item.setIcon(QIcon(garment["thumbnail_path"]))
+            else:
+                item.setIcon(QIcon("./assets/none.png"))
+                item.setText(garment["display_name"])
             item.setData(Qt.UserRole, i)
             self.list_widget.addItem(item)
         #for i in range(9):
@@ -146,8 +199,6 @@ class CameraApp(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-        for i in range(len(garment_name_list)):
-            garment_name_list[i] = garment_name_list[i]+'_vmsdp2ta'
 
         self.viton_thread = VitonThread(garment_name_list)
         self.viton_thread.frameCaptured.connect(self.update_image)
