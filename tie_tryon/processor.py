@@ -97,6 +97,7 @@ class TieTryOnProcessor:
         selected_tie_id: str | None,
         manual_adjustment: ManualAdjustment,
         debug: bool = False,
+        show_keypoints: bool = False,
     ) -> tuple[np.ndarray, dict[str, Any]]:
         output_frame = frame_bgr.copy()
         state: dict[str, Any] = {
@@ -110,7 +111,8 @@ class TieTryOnProcessor:
         }
 
         tie = self.catalog.get(selected_tie_id)
-        if tie is None:
+        should_run_detection = tie is not None or show_keypoints
+        if not should_run_detection:
             return output_frame, state
 
         infer_frame, frame_scale = self._resize_for_inference(frame_bgr)
@@ -121,6 +123,12 @@ class TieTryOnProcessor:
         timestamp_ms = self._next_timestamp_ms()
         pose_result = self.pose_landmarker.detect_for_video(mp_image, timestamp_ms)
         face_result = self.face_landmarker.detect_for_video(mp_image, timestamp_ms)
+        if show_keypoints:
+            output_frame = self._draw_keypoints(output_frame, pose_result, face_result, infer_frame.shape, frame_scale)
+
+        if tie is None:
+            return output_frame, state
+
         transform = self._estimate_transform(
             infer_frame,
             frame_scale,
@@ -232,7 +240,7 @@ class TieTryOnProcessor:
         tie,
         manual_adjustment: ManualAdjustment,
     ) -> TransformEstimate | None:
-        if not pose_result.nose_tippose_landmarks or not face_result.face_landmarks:
+        if not pose_result.pose_landmarks or not face_result.face_landmarks:
             return None
 
         pose_landmarks = pose_result.pose_landmarks[0]
@@ -390,6 +398,28 @@ class TieTryOnProcessor:
         )
         return debug_frame
 
+    def _draw_keypoints(
+        self,
+        frame_bgr: np.ndarray,
+        pose_result: vision.PoseLandmarkerResult,
+        face_result: vision.FaceLandmarkerResult,
+        infer_shape: tuple[int, int, int],
+        frame_scale: float,
+    ) -> np.ndarray:
+        overlay = frame_bgr.copy()
+
+        if pose_result.pose_landmarks:
+            for landmark in pose_result.pose_landmarks[0]:
+                point = self._landmark_to_point(landmark, infer_shape, frame_scale)
+                cv2.circle(overlay, tuple(np.round(point).astype(int)), 3, (0, 220, 255), -1)
+
+        if face_result.face_landmarks:
+            for landmark in face_result.face_landmarks[0]:
+                point = self._landmark_to_point(landmark, infer_shape, frame_scale)
+                cv2.circle(overlay, tuple(np.round(point).astype(int)), 1, (255, 160, 0), -1)
+
+        return overlay
+
     def _pose_point(
         self,
         pose_landmarks,
@@ -397,9 +427,7 @@ class TieTryOnProcessor:
         infer_shape: tuple[int, int, int],
         frame_scale: float,
     ) -> np.ndarray:
-        landmark = pose_landmarks[index]
-        infer_h, infer_w = infer_shape[:2]
-        return np.array([landmark.x * infer_w, landmark.y * infer_h], dtype=np.float32) * frame_scale
+        return self._landmark_to_point(pose_landmarks[index], infer_shape, frame_scale)
 
     def _face_point(
         self,
@@ -408,6 +436,13 @@ class TieTryOnProcessor:
         infer_shape: tuple[int, int, int],
         frame_scale: float,
     ) -> np.ndarray:
-        landmark = face_landmarks[index]
+        return self._landmark_to_point(face_landmarks[index], infer_shape, frame_scale)
+
+    def _landmark_to_point(
+        self,
+        landmark,
+        infer_shape: tuple[int, int, int],
+        frame_scale: float,
+    ) -> np.ndarray:
         infer_h, infer_w = infer_shape[:2]
         return np.array([landmark.x * infer_w, landmark.y * infer_h], dtype=np.float32) * frame_scale

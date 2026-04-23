@@ -54,16 +54,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--fullscreen", action="store_true", help="Launch the window in fullscreen mode")
     parser.add_argument("--debug", action="store_true", help="Draw tracking diagnostics on top of the video")
+    parser.add_argument(
+        "--show-keypoints",
+        action="store_true",
+        help="Draw all detected pose and face keypoints on top of the video",
+    )
     return parser
 
 
 class TieTryOnThread(QThread):
     frame_captured = pyqtSignal(QImage)
 
-    def __init__(self, camera_id, catalog_path, debug):
+    def __init__(self, camera_id, catalog_path, debug, show_keypoints):
         super().__init__()
         self.running = True
         self.debug = debug
+        self.show_keypoints = show_keypoints
         self.catalog = load_tie_catalog(catalog_path)
         self.selected_tie_id = None
         self.manual_adjustments = {item.id: ManualAdjustment() for item in self.catalog.items}
@@ -128,6 +134,7 @@ class TieTryOnThread(QThread):
                     self.selected_tie_id,
                     self.get_adjustment(self.selected_tie_id),
                     debug=self.debug,
+                    show_keypoints=self.show_keypoints,
                 )
                 rgb = cv2.cvtColor(rendered, cv2.COLOR_BGR2RGB)
                 height, width, channel = rgb.shape
@@ -183,6 +190,7 @@ class CameraApp(QMainWindow):
             camera_id=args.camera_id,
             catalog_path=args.catalog,
             debug=args.debug,
+            show_keypoints=args.show_keypoints,
         )
 
         for item in self.tryon_thread.catalog.items:
