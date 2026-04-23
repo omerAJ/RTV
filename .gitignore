@@ -1,8 +1,11 @@
 *.pyc
-assets/
 PerGarmentDatasets/
 checkpoints/
 rtv_ckpts/
 tmp_masks/
 output.mp4
 __pycache__/
+models/mediapipe/*.task
+models/mediapipe/*.part
+/.venv
+/assets

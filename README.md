@@ -1,76 +1,64 @@
-# Real-Time Virtual Try-On
+# Tie-Only Desktop Try-On
 
-[![arXiv](https://img.shields.io/badge/arXiv-2506.12348-b31b1b.svg)](https://arxiv.org/abs/2506.12348)
-[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/wuzaiqiang/rtv_ckpts)
+This branch turns RTV into a lightweight necktie try-on app. The supported product is a CPU-first desktop webcam experience:
 
-This project supports real-time virtual try-on without the need for any special sensors. All you need is a webcam and a PC with a GPU equivalent to an RTX 3060 or higher.
+- MediaPipe pose + face landmarks
+- transparent PNG tie assets
+- no training, no garment checkpoints, no GPU-only stack
 
-Unlike other image-based virtual try-on methods, our approach requires training a dedicated network for each garment in a low-barrier, accessible way (see [this paper](https://arxiv.org/abs/2506.10468)).
-Our method simply overlay the synthesized garment on the top of human body without removing the original garment to achieve real-time performace.
+The app auto-places a tie from shoulders and lower-face landmarks, smooths motion, and lets the user fine-tune position, scale, and rotation from the keyboard.
 
-<p align="center">
-  <img src="assets/output.gif" width="45%" />
-  <img src="assets/Han.gif" width="46%" />
-</p>
+## Setup
 
-
-Check our [tight garment demo](https://www.youtube.com/watch?v=dub0pJ2kXA4) and [loose garment demo](https://www.youtube.com/watch?v=7hm1yBsFzHc) on YouTube.
-
-
-## Installation
-
-```
-git clone https://github.com/ZaiqiangWu/RTV.git
-cd RTV
+```bash
+git checkout ties-only
+python -m pip install -r requirements.txt
 ```
 
-### Environment
-```
-sudo apt install gcc g++ libxcb-xinerama0-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-xkb-dev 
-sudo apt install qtbase5-dev qtbase5-dev-tools libqt5gui5 libqt5widgets5 libqt5multimedia5 libqt5multimediawidgets5 libqt5multimedia5-plugins libpulse-mainloop-glib0
-conda create -n rtv python=3.12
-conda activate rtv
-pip install -r requirements.txt
-pip install --no-build-isolation detectron2@git+https://github.com/facebookresearch/detectron2.git
-pip install --no-build-isolation git+https://github.com/ZaiqiangWu/ROMP.git#subdirectory=simple_romp
+The first run downloads official MediaPipe task bundles into `models/mediapipe/`.
+
+## Run
+
+```bash
+python tie_demo.py
 ```
 
-### Weights
-Download our pretrained checkpoints by running the following command. Please refer to [this page](./training_instructions.md) for instructions on training your own garment items.
-```
-sudo apt install git-lfs
-git lfs install
-git clone https://huggingface.co/wuzaiqiang/rtv_ckpts
+Optional flags:
+
+```bash
+python tie_demo.py --camera-id 1 --catalog assets/ties/catalog.json --fullscreen --debug
 ```
 
-### Real-time virtual try-on
-Please make sure that there is a webcam connected to your PC before running the following command.
-```
-python rtl_demo.py
-```
+`demo.py` and `rtl_demo.py` now forward to the same tie app for convenience.
 
-## BibTeX
-```text
-@inproceedings{wu2025real,
-  title={Real-Time Per-Garment Virtual Try-On with Temporal Consistency for Loose-Fitting Garments},
-  author={Wu, Zaiqiang and Shen, I-Chao and Igarashi, Takeo},
-  booktitle={Computer Graphics Forum},
-  pages={e70272},
-  year={2025},
-  organization={Wiley Online Library}
-}
+## Controls
 
-@article{wu2025low,
-  title={Low-barrier dataset collection with real human body for interactive per-garment virtual try-on},
-  author={Wu, Zaiqiang and Li, Yechen and Liu, Jingyuan and Shibata, Yuki and Hori, Takayuki and Shen, I-Chao and Igarashi, Takeo},
-  journal={IEEE Computer Graphics and Applications},
-  year={2025},
-  publisher={IEEE}
-}
-```
+- `0-9`: select the first ten list entries
+- `Esc` or `Q`: quit
+- Arrow keys: nudge tie position
+- `[` and `]`: scale down or up
+- `,` and `.`: rotate left or right
+- `R`: reset the selected tie's manual adjustment
 
-## License
-This project is licensed under a custom Apache 2.0-based license with a **Non-Commercial Use** clause.  
-You may use, modify, and share the code freely for non-commercial purposes.  
-Commercial use requires prior written permission from the author.  
-See the [LICENSE](./LICENSE) file for details.
+## Catalog Format
+
+The public asset registry lives at `assets/ties/catalog.json`. Each entry must contain:
+
+- `id`: stable tie identifier
+- `name`: display label
+- `asset_path`: transparent BGRA PNG path, relative to the catalog
+- `thumbnail_path`: catalog thumbnail path, relative to the catalog
+- `knot_anchor`: `[x, y]` pixel coordinate of the knot center in the asset canvas
+- `knot_width_ref`: reference knot width in pixels inside the asset canvas
+- `default_scale`: multiplier applied to the runtime knot width
+- `default_offset_x`: horizontal screen-space offset in knot-width units
+- `default_offset_y`: vertical screen-space offset in knot-width units
+- `default_rotation_deg`: per-tie rotation trim in degrees
+
+Assets should use a common transparent canvas with the knot near the top. Collar-covered parts should already be transparent in the PNG so runtime collar masking is unnecessary.
+
+## Branch Notes
+
+- This branch is ties-only. The legacy garment training and DensePose/SMPL/VITON code remains in the tree for reference, but it is not part of the supported runtime or documented workflow.
+- The default install no longer includes Torch, Detectron2, ROMP/BEV, or OpenGL.
+- MediaPipe Tasks supports Python 3.9-3.12, and this branch is intended to run on Python 3.12 as well as current 3.10 environments.
