@@ -6,3 +6,5 @@ rtv_ckpts/
 tmp_masks/
 output.mp4
 __pycache__/
+.venv
+*.task
